@@ -1,0 +1,4 @@
+The quick brown fox jumps over the lazy dog.
+This sentence is used for testing font rendering.
+Document comparison tools should highlight differences.
+End of file A.

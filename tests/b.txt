@@ -1,0 +1,4 @@
+The quick brown fox jumps over a sleeping dog.
+This line is slightly modified for testing font rendering.
+Document diff tools must highlight meaningful changes.
+This is a new line added in file B.
