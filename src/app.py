@@ -2,6 +2,8 @@
 from fastapi import FastAPI, UploadFile, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from docx import Document
+from io import BytesIO
 import difflib
 
 app = FastAPI()
@@ -9,6 +11,15 @@ app = FastAPI()
 # Adjust this if your templates live somewhere else
 templates = Jinja2Templates(directory="src/templates")
 
+async def extract_lines(upload:UploadFile) -> list[str]:
+    raw = await upload.read()
+    filename = (upload.filename)
+
+    if filename.endswith(".docx"):
+        doc = Document(BytesIO(raw))
+        return [p.text for p in doc.paragraphs]
+    else:
+        return raw.decode("utf-8", errors="replace").splitlines()
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -17,11 +28,10 @@ async def index(request: Request):
         {"request": request}
     )
 
-
 @app.post("/diff", response_class=HTMLResponse)
 async def diff(request: Request, file_a: UploadFile, file_b: UploadFile):
-    text_a = (await file_a.read()).decode("utf-8", errors="replace").splitlines()
-    text_b = (await file_b.read()).decode("utf-8", errors="replace").splitlines()
+    text_a = await extract_lines(file_a)
+    text_b = await extract_lines(file_b)
 
     diff_maker = difflib.HtmlDiff(wrapcolumn=80)
     table_html = diff_maker.make_table(
