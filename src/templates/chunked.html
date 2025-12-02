@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Chunked Diff{% endblock %}
+
+{% block extra_head %}
+<style>
+  .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chunk { border: 1px solid #d0d7de; border-radius: 6px; padding: 8px; margin-bottom: 12px; background: #f6f8fa; }
+  .chunk-header { font-size: 12px; color: #57606a; margin-bottom: 6px; }
+  .line-label { font-size: 11px; color: #57606a; margin-bottom: 2px; }
+  .line { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 13px; white-space: pre-wrap; background: #fff; border-radius: 4px; padding: 4px 6px; }
+  .span-a { background: #ffeef0; }  /* removed/old */
+  .span-b { background: #e6ffed; }  /* added/new  */
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Chunked Diff (JSON-based)</h1>
+
+<form id="diff-form">
+  <p><input type="file" name="file_a" required></p>
+  <p><input type="file" name="file_b" required></p>
+  <button type="submit">Compare</button>
+</form>
+
+<div id="results" style="margin-top: 24px;"></div>
+
+<script>
+  const form = document.getElementById('diff-form');
+  const results = document.getElementById('results');
+
+  function highlightLine(text, spans, className) {
+    if (!spans || spans.length === 0) return text;
+    let out = '';
+    let cursor = 0;
+
+    spans.forEach(span => {
+      const start = span.start;
+      const end = span.end;
+      if (start > cursor) {
+        out += text.slice(cursor, start);
+      }
+      out += `<span class="${className}">${text.slice(start, end)}</span>`;
+      cursor = end;
+    });
+
+    if (cursor < text.length) {
+      out += text.slice(cursor);
+    }
+    return out;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    results.innerHTML = 'Loading…';
+
+    const data = new FormData(form);
+    const resp = await fetch('/diff-json', { method: 'POST', body: data });
+    const chunks = await resp.json();
+
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      results.innerHTML = '<p>No differences.</p>';
+      return;
+    }
+
+    const html = chunks.map(chunk => {
+      const { tag, line_a, line_b, a_text, b_text, a_spans, b_spans } = chunk;
+
+      const aLine = a_text ?? '';
+      const bLine = b_text ?? '';
+
+      const aHighlighted = highlightLine(aLine, a_spans, 'span-a');
+      const bHighlighted = highlightLine(bLine, b_spans, 'span-b');
+
+      return `
+        <div class="chunk">
+          <div class="chunk-header">
+            ${tag.toUpperCase()} | A: ${line_a ?? '-'} · B: ${line_b ?? '-'}
+          </div>
+          <div class="diff-grid">
+            <div>
+              <div class="line-label">A (line ${line_a ?? '-'})</div>
+              <div class="line">${aHighlighted}</div>
+            </div>
+            <div>
+              <div class="line-label">B (line ${line_b ?? '-'})</div>
+              <div class="line">${bHighlighted}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    results.innerHTML = html;
+  });
+</script>
+{% endblock %}

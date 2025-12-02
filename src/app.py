@@ -1,30 +1,34 @@
 # app.py
 from fastapi import FastAPI, UploadFile, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from docx import Document
-from io import BytesIO
+
 import difflib
+
+from .docdiff.diff_engine import build_chunks, extract_lines
 
 app = FastAPI()
 
-# Adjust this if your templates live somewhere else
 templates = Jinja2Templates(directory="src/templates")
-
-async def extract_lines(upload:UploadFile) -> list[str]:
-    raw = await upload.read()
-    filename = (upload.filename)
-
-    if filename.endswith(".docx"):
-        doc = Document(BytesIO(raw))
-        return [p.text for p in doc.paragraphs]
-    else:
-        return raw.decode("utf-8", errors="replace").splitlines()
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(
-        "input.html",          # or "input.html" if you kept that name
+        "input.html",         
+        {"request": request}
+    )
+
+@app.post("/diff-json")
+async def diff_json(file_a: UploadFile, file_b: UploadFile):
+    lines_a = await extract_lines(file_a)
+    lines_b = await extract_lines(file_b)
+    chunks = build_chunks(lines_a, lines_b)
+    return JSONResponse(chunks)
+
+@app.get("/chunked", response_class=HTMLResponse)
+async def chunked(request: Request):
+    return templates.TemplateResponse(
+        "chunked.html",
         {"request": request}
     )
 
